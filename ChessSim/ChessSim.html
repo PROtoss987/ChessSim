@@ -1,0 +1,61 @@
+<!DOCTYPE HTML>
+<HTML onclick="onClick(event)">
+<HEAD>
+	<meta charset="utf-8">
+	<title>ChessSim</title>
+	<link rel="stylesheet" href="NGE.css">
+<BODY>
+<div id = "wrapper">
+	<div id = "setup">
+		<select name="" id="gamemode">
+		  <option value="0">Classic</option>
+		  <option value="1">Dragon siege</option>
+		</select>
+		<select name="" id="playmode">
+		  <option value=false>Don't flip</option>
+		  <option value=true>Flip each turn</option>
+		</select>
+		<select name="" id="bottomcolour">
+		  <option value="0">White</option>
+		  <option value="1">Black</option>
+		</select>
+		<button onclick=reset()>Set up</button>
+		<br>
+		<br>
+	</div>
+	<div id = "playingregion">
+		<canvas id="game" width=520px height=520px></canvas>
+
+	<img id = "11" img src="assets/11.png">
+	<img id = "12" img src="assets/12.png">
+	<img id = "13" img src="assets/13.png">
+	<img id = "14" img src="assets/14.png">
+	<img id = "15" img src="assets/15.png">
+	<img id = "16" img src="assets/16.png">
+	<img id = "17" img src="assets/17.png">
+
+	<img id = "01" img src="assets/01.png">
+	<img id = "02" img src="assets/02.png">
+	<img id = "03" img src="assets/03.png">
+	<img id = "04" img src="assets/04.png">
+	<img id = "05" img src="assets/05.png">
+	<img id = "06" img src="assets/06.png">
+	<img id = "07" img src="assets/07.png">
+
+	<br>
+
+	<element onclick="flipBoard(true)">Flip board</element> <element onclick="declareDraw()">Declare Draw</element> <element onclick="surrender()">Surrender</element> <element onclick="reset()">Reset board</element>
+
+	<br>
+
+	<div id = "status">White to move</div>
+	</div>
+
+
+
+<script src="LogHorizon.js"></script>
+
+</div>
+</BODY>
+</HEAD>
+</HTML>

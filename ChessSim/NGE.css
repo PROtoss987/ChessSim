@@ -1,0 +1,43 @@
+body {
+	background-color:#A1A1A1;
+	margin:0px;
+	text-align: center;
+}
+#wrapper {
+	display:inline-block;
+}
+element {
+	background-color:#BFBFBF;
+	width: 25%;
+	text-align: center;
+	float: left;
+	display: block;
+	box-shadow: 0 0 1px #999999 inset;
+	user-select: none;
+}
+element:hover {
+	background-color:#DDDDDD;
+	cursor: pointer;
+}
+canvas {
+	background-color:#BCC4b4;
+	border: 4px solid black;
+	user-select: none;
+}
+img {
+	display: none;
+}
+#setup {
+
+}
+#playingregion {
+
+}
+#status {
+	font-size: 33px;
+	display:inline-block;
+}
+#white {
+	color: white;
+	display:inline-block;
+}
