@@ -10,6 +10,7 @@
 		<select name="" id="gamemode">
 		  <option value="0">Classic</option>
 		  <option value="1">Dragon siege</option>
+		  <option value="2">Anitwitter</option>
 		</select>
 		<select name="" id="playmode">
 		  <option value=false>Don't flip</option>
@@ -22,6 +23,9 @@
 		<button onclick=reset()>Set up</button>
 		<br>
 		<br>
+	</div>
+	<div id = "setupbutton">
+		<!--<button onclick=reset()>Set up</button>-->
 	</div>
 	<div id = "playingregion">
 		<canvas id="game" width=520px height=520px></canvas>
@@ -41,10 +45,11 @@
 	<img id = "05" img src="assets/05.png">
 	<img id = "06" img src="assets/06.png">
 	<img id = "07" img src="assets/07.png">
+	<img id = "08" img src="assets/08.png">
 
 	<br>
 
-	<element onclick="flipBoard(true)">Flip board</element> <element onclick="declareDraw()">Declare Draw</element> <element onclick="surrender()">Surrender</element> <element onclick="reset()">Reset board</element>
+	<element onclick="flipBoard(true)">Flip board</element> <element onclick="declareDraw()">Declare Draw</element> <element onclick="surrender()">Surrender</element> <element onclick="undo()">Undo last move</element>
 
 	<br>
 
