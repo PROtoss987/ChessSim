@@ -1,7 +1,7 @@
 var boardTemplate = [[[4,3,2,5,6,2,3,4],[1,1,1,1,1,1,1,1]],
-                     [[0,7,3,0,0,3,7,0],[1,1,1,0,0,1,1,1]]]
-//Very important, used in calculation for placing pieces on an empty board
-//Easier to set up than nested elifs or switch, just iterate through and overlay onto the board array
+                     [[0,7,3,0,0,3,7,0],[1,1,1,0,0,1,1,1]],]
+//Used in calculation for placing pieces on an empty board
+//Iterated through and overlayed onto the board array
 //var coords;
 var legalMoves = [];
 var oldselection = []
@@ -9,15 +9,12 @@ var turn = 0
 var moveHistory = []
 var gameState = 0
 var enPassant = []
-var castling = [[1,1],[1,1]]
+var castling = [[1,1,1],[1,1,1]]
 //declaring as global for to work iteratively when the click event triggers in separate functions
 var bottomColour = 0
 //fetches value from the dropdowns in the HTML
 var gamemode = Number(document.getElementById('gamemode').value)
 var singleplayer = toBoolean(singleplayer = document.getElementById('playmode').value)
-
-var boardHeight = 8
-var boardWidth = 8
 
 var tile;
 
@@ -45,23 +42,42 @@ function sameArray(firstArray, secondArray) {
     }
     return equal
 }
-function resizeGrid () {
+
+function resizeCanvas (board) {
 	var browserHeight = document.body.offsetHeight
-	newSize = browserHeight / 0.9
+	var newSize = browserHeight / 0.9
 	document.getElementById('game').height = newSize;
     document.getElementById('game').width = newSize;
 
-    tile = getTileSize()
+    tile = getTileSize(board)
 }
 
-function getTileSize() {
+function getTileSize(board) {
 	//Calculates the size of each tile of the chess board, by dividing the canvas size by average # of squares
+	var boardHeight = board.length
+	var boardWidth = board[0].length
 	var canvas = document.getElementById('game');
 	var tile = ((canvas.width + canvas.height)/2) / ((boardHeight+boardWidth)/2)
 	
 	document.getElementById('game').height = boardHeight*tile;
     document.getElementById('game').width = boardWidth*tile;
     return tile
+}
+
+var setUpCounter = 0
+function setUp() {
+	if (setUpCounter == 0) {
+		document.getElementById("setup").style.visibility='hidden';
+		document.getElementById("playingregion").style.visibility='visible';
+		document.getElementById("setupbutton").innerHTML = "<button onclick=setUp()>Back to setup</button><br>"
+		setUpCounter++
+	}
+	else {
+		document.getElementById("setup").style.visibility='visible';
+		document.getElementById("playingregion").style.visibility='hidden';
+		document.getElementById("setupbutton").innerHTML = "<button onclick=setUp()>Set up</button><br>"
+		setUpCounter--
+	}
 }
 
 function reset() {
@@ -75,17 +91,88 @@ function reset() {
 	moveHistory = []
 	gameState = 0
 	enPassant = []
-	castling = [[1,1],[1,1]]
+	castling = [[1,1,1],[1,1,1]]
 	gamemode = Number(document.getElementById('gamemode').value)
 	singleplayer = toBoolean(document.getElementById('playmode').value)
 	bottomColour = Number(document.getElementById('bottomcolour').value)
 	document.getElementById("status").innerHTML = "White to move"
 
-	board = genBoard(boardHeight,boardWidth,gamemode)
+	board = genBoard(gamemode)
 	if (bottomColour == 1) {
 		flipBoard(false)
 	}
+	tile = getTileSize(board)
 	drawBoard()
+}
+function undo() {
+	if (moveHistory.length > 0) {
+		//moveHistory.push([oldselection, coords, board[y][x][0], moveType])
+		var lastMove = moveHistory[moveHistory.length-1]
+		var oldY = lastMove[0][0]
+		var oldX = lastMove[0][1]
+		var y = lastMove[1][0]
+		var x = lastMove[1][1]
+
+		var secondLastMove = moveHistory[moveHistory.length-2]
+		//console.log(moveHistory)
+		//undoes castling, otherwise calls the normal move function, which does castling the normal way only
+		if (board[y][x][0] == 6 && Math.abs(oldX - x) == 2) {
+			if (x > oldX) {
+				//right side
+				board[y][board[y].length-1] = board[y][oldX+1]
+				board[y][oldX+1] = 0
+				//moving the king
+				board[y][x-2] = board[y][x]
+				board[y][x] = 0
+			}
+			else {
+				//left side
+				board[y][0] = board[y][oldX-1]
+				board[y][oldX-1] = 0
+				//moving the king
+				board[y][x+2] = board[y][x]
+				board[y][x] = 0
+			}
+		}
+		else {
+			board = movePiece(lastMove[1],lastMove[0])
+		}
+		//putting back taken pieces
+		if (lastMove[2] != undefined) {
+			board[y][x] = [lastMove[2],turn%2]
+		}
+		enPassant = []
+		switch(lastMove[3]) {
+			case 1:
+				//en passant
+				board[y - (-2*Math.abs(turn % 2 - bottomColour) + 1)][x] = [1,turn%2]
+			break;
+			case 3:
+				castling[(turn-1)%2][0] = 1
+			break;
+			case 4:
+				castling[(turn-1)%2][1] = 1
+			break;
+			case 5:
+				castling[(turn-1)%2][2] = 1
+			break;
+			case 6:
+				//de-promotion
+				board[oldY][oldX][0] = 1
+			break;
+		}
+		if (moveHistory.length > 1) {
+			//set up en passant if it was possible on a previous gamestate
+			if (secondLastMove[3] == 2) {
+				enPassant = [secondLastMove[1][0] + (-2*Math.abs(turn % 2 - bottomColour) + 1),secondLastMove[1][1]]
+			}
+		}
+
+		//remove last element
+		moveHistory.splice(moveHistory.length-1,1)
+		turn --
+		drawBoard();
+	}
 }
 
 function flipBoard (buttonCall) {
@@ -159,39 +246,48 @@ function surrender () {
 	}
 }
 
-function genBoard(height,width,gamemode) {
+function genBoard(gamemode) {
 	//create an empty board
-	gridArray = genGrid(height,width)
+	gridArray = genGrid(gamemode)
     
     //put pieces onto the empty board
 	board = fillGrid(gridArray,gamemode)
-	//console.log(board)
 	return board
 }
 
-function genGrid(height,width) {
+function genGrid(gamemode) {
 	//populates the board with empty tiles
-	gridArray = []
+	var height = -1;
+	var width = -1
+	switch(gamemode) {
+		case 0:
+			height = 8;
+			width = 8;
+		break;
+		case 1:
+			height = 8;
+			width = 8;
+		break;
+	}
+	emptyGrid = []
 	for (var i = 0; i < height; i++) {
-        gridArray.push([])
+        emptyGrid.push([])
         for (var j = 0; j < width; j++) {
-            gridArray[i].push(0)   
+            emptyGrid[i].push(0)   
         }
     }
-    return gridArray
+    return emptyGrid
 }
 	
 function fillGrid(board, gamemode) {
 	//puts the pieces on the board
 	//console.log(boardTemplate)
 	//used to have a gamemode variable, which was taken out
-    switch(gamemode) {
-    	//classic
-    	case 0:
-    		for (var i = 0; i < boardHeight; i++) {
-    			//console.log(i)
-    			for (var j = 0; j < boardWidth; j++) {
-	    			//console.log(i,o)
+	for (var i = 0; i < board.length; i++) {
+		for (var j = 0; j < board[i].length; j++) {
+			switch(gamemode) {
+				case 0:
+					//classic
 	    			switch(i) {
 		    			case 0:
 		    				board[i][j] = [boardTemplate[0][0][j],1]
@@ -206,38 +302,34 @@ function fillGrid(board, gamemode) {
 		    				board[i][j] = [boardTemplate[0][0][j],0]
 		    			break;
 	    			}
-    			}
-    		}
-    	break;
-    	//dragon siege
-    	case 1:
-    		for (var i = 0; i < boardHeight; i++) {
-    			for (var j = 0; j < boardWidth; j++) {
-	    			switch(i) {
-		    			case 0:
-		    				if (boardTemplate[0][0][j] != 0) {
-		    					board[i][j] = [boardTemplate[0][0][j],1]
-		    				}
-		    			break;
-		    			case 1:
-			    			if (boardTemplate[0][1][j] != 0) {
-			    				board[i][j] = [boardTemplate[0][1][j],1]
-			    			}
-		    			break;
-		    			case board.length-2:
-			    			if (boardTemplate[1][1][j] != 0) {
-			    				board[i][j] = [boardTemplate[1][1][j],0]
-			    			}
-		    			break;
-		    			case board.length-1:
-		    				if (boardTemplate[1][0][j] != 0) {
-		    					board[i][j] = [boardTemplate[1][0][j],0]
-		    				}
-		    			break;
-	    			}
-    			}
-    		}
-    	break;
+				break;
+				case 1:
+					//dragon siege
+					switch(i) {
+						case 0:
+							if (boardTemplate[0][0][j] != 0) {
+								board[i][j] = [boardTemplate[0][0][j],1]
+							}
+						break;
+						case 1:
+							if (boardTemplate[0][1][j] != 0) {
+								board[i][j] = [boardTemplate[0][1][j],1]
+							}
+						break;
+						case board.length-2:
+							if (boardTemplate[1][1][j] != 0) {
+								board[i][j] = [boardTemplate[1][1][j],0]
+							}
+						break;
+						case board.length-1:
+							if (boardTemplate[1][0][j] != 0) {
+								board[i][j] = [boardTemplate[1][0][j],0]
+							}
+						break;
+					}
+				break;
+			}
+		}
 	}
 	//console.log(board)
     return(board)
@@ -250,6 +342,15 @@ function drawBoard() {
 			//the index of the tile, and the sum of the indeces
 			drawSquare(i,j,(i+j),false)
 		}
+	}
+	//updating the "to move" HTML
+	switch (turn % 2) {
+		case 0:
+			document.getElementById("status").innerHTML = "White to move"
+		break;
+		case 1:
+			document.getElementById("status").innerHTML = "Black to move"
+		break;
 	}
 }
 
@@ -275,11 +376,11 @@ function drawSquare(column, row, indexSum, highlighted) {
 	    	ctx.fillStyle = "#82959C";
 	    }
     }
-    //If the king is in check, puts a red tile under him
-	if (inCheck(board)) {
-		//checks if the tile being drawn has the relevant king on it
-		if (typeof board[column][row] === 'object') {
-			if (board[column][row][0] == 6 && board[column][row][1] == turn % 2) {
+    //checks if the tile being drawn has the relevant king on it
+	if (typeof board[column][row] === 'object') {
+		if (board[column][row][0] == 6 && board[column][row][1] == turn % 2) {
+			//If the king is in check, puts a red tile under him
+			if (inCheck(board)) {
 				ctx.fillStyle = "#FF5555"
 			}
 		}
@@ -297,7 +398,7 @@ function drawPiece (row, column, ctx) {
 		//my images are named according to colour and type, this selects its corresponding png file from an invisible image in the HTML
 		//file format: 'Piece colour''Piece type'.png
     	var img = document.getElementById("" + tileValue[1] + tileValue[0]);
-    	//checks if the tile has a value. Can be done differently but this also prevents syntax errors from referencing nonexistent tags
+    	//checks if the tile has a value. Can be done differently but this also prevents runtime errors from referencing nonexistent tags
     	if (img != null){
     		ctx.drawImage(img, row*tile, column*tile, tile, tile);
     	}
@@ -331,6 +432,7 @@ function onClick(event) {
 
 				//clearing, then adding the en passant tile to be taken
 				var valueSet = false
+				var moveType = 0
 				switch (board[oldY][oldX][0]) {
 					case 1:
 					//pawn
@@ -340,18 +442,22 @@ function onClick(event) {
 							enPassant.push(oldY+(2* Math.abs(turn % 2 - bottomColour) - 1))
 							enPassant.push(x)
 							valueSet = true
-						}	
-						//Promotion
-						if (y == 0 || y == boardHeight - 1) {
-							//turns the pawn into a queen
-							board[oldY][oldX][0] = 5
-							//tried adding into movePiece, when gameEndCheck calls getLegalMoves the pawn gets promoted for some reason
+							moveType = 2
+						}
+						//marking en passant capture in move history
+						if (sameArray(coords, enPassant)) {
+							moveType = 1
+						}
+						if (y == 0 || y == board.length-1) {
+							//marking promotion
+							moveType = 6
 						}
 					break;
 					//castling
 					case 6:
 						//king disable
-						castling[turn % 2] = 0
+						castling[turn % 2][2] = 0
+						moveType = 5
 					break;
 					case 4:
 						//rook disable
@@ -361,14 +467,17 @@ function onClick(event) {
 							if (oldY == 7*(-1*Math.abs(turn % 2 - bottomColour) + 1) && (oldX == 0 || oldX == board[oldY].length - 1)) {
 								//NOT oldX / 7 but only if bottomColour is 1
 								castling[turn % 2][Math.abs((oldX / 7) - bottomColour)] = 0
+								moveType = 3 + Math.abs((oldX / 7) - bottomColour)
 							}
 						}
 					break;
 					case 7:
-
+						//dragon
 					break;
 				}
 
+				moveHistory.push([oldselection, coords, board[y][x][0], moveType])
+				//console.log(moveType)
 				board = movePiece(oldselection, coords)
 
 				// If en passant was not done, it is cleared after the next move
@@ -376,18 +485,9 @@ function onClick(event) {
 					enPassant = []
 				}
 				turn ++
+				if (gamemode == 2) {turn ++}
 				legalMoves = []
 				drawBoard()
-
-				//updating the "to move" HTML
-				switch (turn % 2) {
-					case 0:
-						document.getElementById("status").innerHTML = "White to move"
-					break;
-					case 1:
-						document.getElementById("status").innerHTML = "Black to move"
-					break;
-				}
 
 			var moveFound = gameEndCheck(gamemode)
 
@@ -396,7 +496,7 @@ function onClick(event) {
 				flipBoard(true)
 			}
 		}
-		else if ((oldselection[0] !== y || oldselection[1] !== x && board[y][x][1] == turn % 2) && coords !== -1) {
+		else if (((oldselection[0] !== y || oldselection[1] !== x) && board[y][x][1] == turn % 2) && coords !== -1) {
 			//maybe this should be checking for whether or not there are no legal moves, watch out for any potential errors
 			drawBoard()
 			var selectedPiece = board[y][x]
@@ -424,9 +524,9 @@ function onClick(event) {
 
 function findClick(clickEvent) {
 	//information about size and location relative to the browser, returns -1 if click is outside of the canvas
-	var canvasInfo = document.getElementById("game").getBoundingClientRect()
+	const canvasInfo = document.getElementById("game").getBoundingClientRect()
 	//getBoundingClientRect includes the border but getElementById does not. The difference is double the border width (both sides of the rectangle) which fixes the offset
-	borderSize = (canvasInfo.width - document.getElementById("game").width) / 2
+	const borderSize = (canvasInfo.width - document.getElementById("game").width) / 2
 
 	//event gives you the coordinate of the click on the entire browser. this removes the non-canvas parts of the browser from the coordinates
 	//dividing the pixels by the tile size returns the index of the square clicked on
@@ -790,6 +890,7 @@ function rook (possibleMoves, y, x, colour, board, checkCall) {
 		return possibleMoves
 	}
 }
+// queen is just bishop and rook
 function king(possibleMoves, y, x, colour, board, checkCall) {
 	var foundCheck = false
 	//A very simple adjacent tiles check. The hard part comes in getLegalMoves
@@ -818,7 +919,7 @@ function king(possibleMoves, y, x, colour, board, checkCall) {
 			//move in the opposite direction if board is flipped
 			var moveDirection = -2 * bottomColour + 1
 			//queen side
-			if (castling[turn % 2][0] == 1) {
+			if (castling[turn % 2][0] == 1 && castling[turn % 2][2] == 1) {
 				var unobstructed = true
 				//checking if there are any pieces between the casting pieces
 				for (i = 1; i < 4; i++) {
@@ -834,7 +935,7 @@ function king(possibleMoves, y, x, colour, board, checkCall) {
 				}
 			}
 			//king side
-			if (castling[turn % 2][1] == 1) {
+			if (castling[turn % 2][1] == 1 && castling[turn % 2][2] == 1) {
 				var unobstructed = true
 				for (i = 1; i < 3; i++) {
 					if (typeof board[y][x+i * moveDirection] === 'object') {
@@ -854,33 +955,45 @@ function king(possibleMoves, y, x, colour, board, checkCall) {
 }
 function dragon(possibleMoves, y, x, colour, board, checkCall) {
 	var foundCheck = false
-	var NOTColour = -colour + 1
 	for (var i = -3; i <= 3; i += 1) {
-		if(checkCall || i%2 !== 0) {
+		if(checkCall || i%2 !== 0 || true) {
 			if (y + i < board.length && y + i >= 0) {
-				if(checkCall) {
-					if(sameArray(board[y+i][x],[7,NOTColour])) {
+				if (typeof board[y+i][x] !== 'object') {
+					possibleMoves.push([y+i,x])
+				}
+				else if (board[y+i][x][1] !== colour) {
+					possibleMoves.push([y+i,x])
+					if (board[y+i][x][0] == 7) {
 						foundCheck = true
 					}
-				}
-				else if (typeof board[y+i][x] !== 'object') {
-					possibleMoves.push([y+i,x])
-				}
-				else if (board[y+i][x][1] !== NOTColour) {
-					possibleMoves.push([y+i,x])
 				}
 			}
 			if (x + i < board[y].length && x + i >= 0) {
-				if(checkCall) {
-					if(sameArray(board[y][x+i],[7,NOTColour])) {
+				if (typeof board[y][x+i] !== 'object') {
+					possibleMoves.push([y,x+i])
+				}
+				else if (board[y][x+i][1] !== colour) {
+					possibleMoves.push([y,x+i])
+					if (board[y][x+i][0] == 7) {
 						foundCheck = true
 					}
 				}
-				else if (typeof board[y][x+i] !== 'object') {
-					possibleMoves.push([y,x+i])
-				}
-				else if (board[y][x+i][1] !== NOTColour) {
-					possibleMoves.push([y,x+i])
+			}
+		}
+	}
+	for (var i = -1; i <= 1; i += 2) {
+		for (var j = -1; j <= 1; j += 2) {
+			if (y + i > 0 && y + i < board.length) {
+				if (x + j > 0 && x + j < board[y].length) {
+					if (typeof board[y+i][x+j] !== 'object') {
+						possibleMoves.push([y+i,x+j])
+					}
+					else if (board[y+i][x+j][1] !== colour) {
+						possibleMoves.push([y+i,x+j])
+						if (board[y+i][x+j][0] == 7) {
+							foundCheck = true
+						}
+					}
 				}
 			}
 		}
@@ -911,41 +1024,76 @@ function movePiece(oldPosition, newPosition) {
 	var oldY = oldPosition[0]
 	var oldX = oldPosition[1]
 
-
-
 	var tempBoard = []
+	//For some reason objects are much harder to create copies of, the new one will just reference but not clone the global board unless I copy each and every entry one by one.
 	for (var i = 0; i < board.length; i++) {
 		tempBoard.push([])
 		for (var j = 0; j < board[i].length; j++) {
-			tempBoard[i].push(board[i][j])
+			tempBoard[i].push([])
+			if(typeof board[i][j] == 'object') {
+				//console.log('here')
+				tempBoard[i][j].push(board[i][j][0])
+				tempBoard[i][j].push(board[i][j][1])
+			}
+			else {
+				tempBoard[i][j] = 0
+			}
 		}
 	}
 
-	//castling
-	//checking if king moved 2 tiles
-	if (tempBoard[oldY][oldX][0] == 6 && Math.abs(x - oldX) == 2) {
-		//checking if king went right or left
-		if (x > oldX) {
-			tempBoard[y][oldX+1] = tempBoard[y][tempBoard[y].length-1]
-			tempBoard[y][tempBoard[y].length-1] = 0
-		}
-		else {
-			tempBoard[y][oldX-1] = tempBoard[y][0]
-			tempBoard[y][0] = 0
-		}
+	switch(tempBoard[oldY][oldX][0]) {
+		case 1:
+			//if en passant, removing the piece behind the pawn
+			//y + NOT NOT colour 
+			if (y == enPassant[0] && x == enPassant[1]) {
+			tempBoard[y+(-2*Math.abs(turn % 2 - bottomColour) + 1)][x] = 0
+			}
+			//promotion
+			else if (y == 0 || y == tempBoard.length - 1) {
+				tempBoard[oldY][oldX][0] = 5
+			}
+		break;
+		case 6:
+			//castling
+			//checking if king moved 2 tiles
+			if (Math.abs(x - oldX) == 2) {
+				//checking if king went right or left
+				if (x > oldX) {
+					tempBoard[y][oldX+1] = tempBoard[y][tempBoard[y].length-1]
+					tempBoard[y][tempBoard[y].length-1] = 0
+				}
+				else {
+					tempBoard[y][oldX-1] = tempBoard[y][0]
+					tempBoard[y][0] = 0
+				}
+			}
+		break;
+		case 7:
+			//taking inbetween pieces
+			if (Math.abs(x - oldX) > 1) {
+				for (var i = oldX - x; i != 0; i += (x - oldX) / Math.abs(x - oldX)) {
+					if (typeof tempBoard[y][x+i] == 'object') {
+						if (tempBoard[y][x+i][1] != turn%2) {
+							tempBoard[y][x+i] = 0
+						}
+					}
+				}
+			}
+			if (Math.abs(y - oldY) > 1) {
+				for (var i = oldY - y; i != 0; i += (y - oldY) / Math.abs(y - oldY)) {
+					if (typeof tempBoard[y+i][x] == 'object') {
+						if (tempBoard[y+i][x][1] != turn%2) {
+							tempBoard[y+i][x] = 0
+						}
+					}
+				}
+			}
+		break;
 	}
 
 	//Moving the piece
 	tempBoard[y][x] = tempBoard[oldY][oldX]
 	tempBoard[oldY][oldX] = 0
-
-	//if en passant, removing the piece behind the pawn
-	//y + NOT NOT colour 
-	if (tempBoard[y][x][0] == 1) {
-		if (y == enPassant[0] && x == enPassant[1]) {
-		tempBoard[y+(-2*Math.abs(turn % 2 - bottomColour) + 1)][x] = 0
-		}
-	}
 
 	return tempBoard
 }
@@ -954,12 +1102,12 @@ function inCheck(tempBoard) {
 	//Checks if the king is in danger in a given board
 	var colour = turn % 2
 	//get coordinates of king
-	var y = 0;
-	var x = 0;
+	var y;
+	var x;
 	//getting the coordinates of the relevant king
 	var located = false;
 	for (var i = 0; i < tempBoard.length && located == false; i++) {
-		for (var j = 0; j < tempBoard[y].length && located == false; j++) {
+		for (var j = 0; j < tempBoard[i].length && located == false; j++) {
 			if (tempBoard[i][j][0] == 6) {
 				if (tempBoard[i][j][1] == colour) {
 					y = i
@@ -969,35 +1117,38 @@ function inCheck(tempBoard) {
 				}
 			}
 		}
-	
 	var foundCheck = false
-	//pawn
-		if(pawn([], y, x, colour, tempBoard, true)) {
-			foundCheck = true
-		}
-	//king 
-		if(king([], y, x, colour, tempBoard, true)) {
-			foundCheck = true
-		}
-	//knight
-		if(knight([], y, x, colour, tempBoard, true)) {
-			foundCheck = true
-		}
-	//bishop/queen
-		if(bishop([], y, x, colour, tempBoard, true)) {
-			foundCheck = true
-		}
-	//rook/queen
-		if(rook([], y, x, colour, tempBoard, true)) {
-			foundCheck = true
-		}
-	//dragon
-		if(dragon([], y, x, colour, tempBoard, true)) {
-			foundCheck = true
-		}
+	if (located == true) {	
+		//pawn
+			if(pawn([], y, x, colour, tempBoard, true)) {
+				foundCheck = true
+			}
+		//king 
+			if(king([], y, x, colour, tempBoard, true)) {
+				foundCheck = true
+			}
+		//knight
+			if(knight([], y, x, colour, tempBoard, true)) {
+				foundCheck = true
+			}
+		//bishop/queen
+			if(bishop([], y, x, colour, tempBoard, true)) {
+				foundCheck = true
+			}
+		//rook/queen
+			if(rook([], y, x, colour, tempBoard, true)) {
+				foundCheck = true
+			}
+		//dragon
+			if (gamemode == 1) {
+				if(dragon([], y, x, colour, tempBoard, true)) {
+					foundCheck = true
+				}
+			}
+	}
 	return foundCheck
 }
 
-resizeGrid()
-var board = genBoard(boardHeight,boardWidth,gamemode)
+var board = genBoard(gamemode)
+resizeCanvas(board)
 drawBoard()

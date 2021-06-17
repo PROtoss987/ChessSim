@@ -31,7 +31,7 @@ img {
 
 }
 #playingregion {
-
+	visibility: visible;
 }
 #status {
 	font-size: 33px;
