@@ -485,7 +485,6 @@ function onClick(event) {
 					enPassant = []
 				}
 				turn ++
-				if (gamemode == 2) {turn ++}
 				legalMoves = []
 				drawBoard()
 
